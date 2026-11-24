@@ -22,6 +22,7 @@ from mmsim.config import (
 )
 from mmsim.experiments import plotting
 from mmsim.experiments.common import (
+    COUNTERPARTIES,
     DEFAULT_MODEL,
     PNL_COMPONENTS,
     RESULTS_DIR,
@@ -32,6 +33,7 @@ from mmsim.experiments.common import (
     with_informed_share,
     write_csv,
 )
+from mmsim.market import TakerType
 from mmsim.metrics import RunMetrics
 
 INFORMED_SHARES = (0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6)
@@ -39,7 +41,7 @@ HALF_SPREADS = (0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0)
 E4_SEEDS = range(1000, 1200)
 SENSITIVITY_SEEDS = range(1000, 1100)
 JUMP_SENSITIVITY_MODEL = replace(DEFAULT_MODEL, value=replace(DEFAULT_MODEL.value, jump_prob=0.01))
-DECOMPOSED_STRATEGIES = ("Naive", "A-S (Sharpe)")
+DECOMPOSED_STRATEGIES = ("Naive", "A-S (mean/std)")
 SWEPT_FAMILIES = ("Naive", "Skew")
 
 
@@ -199,6 +201,14 @@ def write_tables(sweep: ToxicitySweep, out_dir: Path, suffix: str = "") -> None:
     )
 
 
+def family_label(family: str) -> str:
+    """Display label of a swept family; parameters other than h are those of the tuned strategy."""
+    tuned = REPORTED_STRATEGIES[family]
+    if isinstance(tuned, InventorySkewConfig):
+        return f"{family} (α = {tuned.skew:g})"
+    return family
+
+
 def plot_half_spread_curves(sweep: ToxicitySweep, out_dir: Path) -> None:
     """Plot mean PnL against the half-spread for every pi, one panel per swept family."""
     figure = plotting.new_figure(11, 4.2)
@@ -225,7 +235,9 @@ def plot_half_spread_curves(sweep: ToxicitySweep, out_dir: Path) -> None:
                 markeredgecolor=plotting.SURFACE,
             )
         axes.axhline(0, color=plotting.AXIS, linewidth=1.0)
-        axes.set_title(f"{family}: mean PnL per run vs half-spread h (large dot = optimum)")
+        axes.set_title(
+            f"{family_label(family)}: mean PnL per run vs half-spread h (large dot = optimum)"
+        )
         axes.set_xlabel("half-spread h (ticks)")
     panels[0].set_ylabel("mean PnL per run (ticks)")
     panels[-1].legend(loc="upper right", title="toxicity", title_fontsize=8)
@@ -247,7 +259,7 @@ def plot_breakeven(base: ToxicitySweep, jumps: ToxicitySweep, out_dir: Path) -> 
                 linestyle=style,
                 marker="o",
                 markersize=4,
-                label=f"{family}, {model}",
+                label=f"{family_label(family)}, {model}",
             )
             optimal_axes.plot(
                 INFORMED_SHARES,
@@ -256,7 +268,7 @@ def plot_breakeven(base: ToxicitySweep, jumps: ToxicitySweep, out_dir: Path) -> 
                 linestyle=style,
                 marker="o",
                 markersize=4,
-                label=f"{family}, {model}",
+                label=f"{family_label(family)}, {model}",
             )
     breakeven_axes.set_title("Break-even half-spread (smallest h with mean PnL ≥ 0)")
     optimal_axes.set_title("Optimal half-spread (highest mean PnL)")
@@ -270,12 +282,12 @@ def plot_breakeven(base: ToxicitySweep, jumps: ToxicitySweep, out_dir: Path) -> 
             mean_ci(column(base.tuned[label][share], PNL_COMPONENTS["pnl"]))
             for share in INFORMED_SHARES
         ]
-        _line_with_band(pnl_axes, estimates, color, label)
+        _line_with_band(pnl_axes, estimates, color, plotting.strategy_label(label))
     pnl_axes.axhline(0, color=plotting.AXIS, linewidth=1.0)
     pnl_axes.set_title("Tuned strategies: mean PnL per run (95% CI)")
     pnl_axes.set_xlabel("toxicity π")
     pnl_axes.set_ylabel("mean PnL per run (ticks)")
-    pnl_axes.legend(loc="upper right")
+    pnl_axes.legend(loc="upper right", fontsize=7)
     plotting.save(figure, out_dir / "e4_breakeven.png")
 
 
@@ -284,8 +296,8 @@ def plot_decomposition(sweep: ToxicitySweep, out_dir: Path) -> None:
     figure = plotting.new_figure(11, 4.2)
     panels = figure.subplots(1, len(DECOMPOSED_STRATEGIES), sharey=True)
     parts = {
-        "noise_edge": ("edge from noise takers", plotting.SERIES[0]),
-        "informed_edge": ("edge from informed takers", plotting.SERIES[1]),
+        "noise_edge": (f"edge from {COUNTERPARTIES[TakerType.NOISE]}", plotting.SERIES[0]),
+        "informed_edge": (f"edge from {COUNTERPARTIES[TakerType.INFORMED]}", plotting.SERIES[1]),
         "inventory": ("inventory PnL", plotting.SERIES[2]),
         "pnl": ("total PnL", plotting.INK),
     }
@@ -297,7 +309,7 @@ def plot_decomposition(sweep: ToxicitySweep, out_dir: Path) -> None:
             ]
             _line_with_band(axes, estimates, color, name)
         axes.axhline(0, color=plotting.AXIS, linewidth=1.0)
-        axes.set_title(f"{label}: PnL decomposition by toxicity")
+        axes.set_title(f"{plotting.strategy_label(label)}\nPnL decomposition by toxicity")
         axes.set_xlabel("toxicity π")
     panels[0].set_ylabel("mean per run (ticks, 95% CI)")
     panels[-1].legend(loc="upper right")

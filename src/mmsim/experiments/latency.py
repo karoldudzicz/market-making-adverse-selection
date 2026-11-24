@@ -85,14 +85,15 @@ def plot_latency(results: LatencyResults, out_dir: Path) -> None:
                 marker="o",
                 markersize=4,
                 capsize=2,
-                label=label,
+                label=plotting.strategy_label(label),
             )
         axes.axhline(0, color=plotting.AXIS, linewidth=1.0)
         axes.set_xticks(LATENCIES)
         axes.set_title(title)
         axes.set_xlabel("latency L (steps)")
     panels[0].set_ylabel("paired change per run (ticks, 95% CI)")
-    panels[0].legend(loc="lower left")
+    handles, names = panels[0].get_legend_handles_labels()
+    figure.legend(handles, names, loc="outside lower center", ncols=2)
     plotting.save(figure, out_dir / "e5_latency.png")
 
 

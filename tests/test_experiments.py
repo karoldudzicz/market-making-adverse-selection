@@ -17,7 +17,8 @@ from mmsim.experiments.breakeven import (
     swept_strategy,
 )
 from mmsim.experiments.calibrate import JUMP_BEFORE, fit_intensity, recovery_steps
-from mmsim.experiments.common import mean_ci
+from mmsim.experiments.common import mean_ci, ratio_ci
+from mmsim.experiments.plotting import strategy_label
 from mmsim.experiments.tune import GridPoint, Objective, select
 
 
@@ -76,7 +77,7 @@ def test_mean_objective_prefers_lower_risk_among_statistically_tied_points() -> 
     assert select([risky_best, safe_tied, clearly_worse], Objective.MEAN) is safe_tied
 
 
-def test_sharpe_objective_prefers_higher_mean_among_tied_ratios() -> None:
+def test_mean_over_std_objective_prefers_higher_mean_among_tied_ratios() -> None:
     rng = np.random.default_rng(1)
     noise = rng.normal(0.0, 1.0, 200)
     noise = (noise - noise.mean()) / noise.std(ddof=1)
@@ -84,8 +85,8 @@ def test_sharpe_objective_prefers_higher_mean_among_tied_ratios() -> None:
     large = point(list(99 + 10 * noise))
     risky = point(list(200 + 100 * noise))
 
-    assert math.isclose(small.sharpe, 10.0)
-    assert select([small, large, risky], Objective.SHARPE) is large
+    assert math.isclose(small.mean_over_std, 10.0)
+    assert select([small, large, risky], Objective.MEAN_OVER_STD) is large
 
 
 def test_breakeven_and_optimal_half_spread_on_the_grid() -> None:
@@ -103,13 +104,29 @@ def test_swept_strategy_keeps_tuned_parameters_except_half_spread() -> None:
     assert skew == replace(REPORTED_STRATEGIES["Skew"], half_spread=3.0)
     assert swept_strategy("Naive", 0.5) == NaiveConfig(half_spread=0.5)
     with pytest.raises(ValueError, match="no half-spread"):
-        swept_strategy("A-S (Sharpe)", 1.0)
+        swept_strategy("A-S (mean/std)", 1.0)
 
 
 def test_tuned_strategy_parameters_match_the_decisions() -> None:
     assert {
         "Naive": NaiveConfig(half_spread=1.5),
         "Skew": InventorySkewConfig(half_spread=2.0, skew=0.5),
-        "A-S (Sharpe)": AvellanedaStoikovConfig(gamma=0.003, horizon=1000.0, k=0.627569),
+        "A-S (mean/std)": AvellanedaStoikovConfig(gamma=0.003, horizon=1000.0, k=0.627569),
         "A-S (mean)": AvellanedaStoikovConfig(gamma=0.01, horizon=10.0, k=0.627569),
     } == REPORTED_STRATEGIES
+
+
+def test_ratio_ci_pools_numerators_and_denominators() -> None:
+    exact = ratio_ci([2.0, 4.0, 6.0], [1.0, 2.0, 3.0])
+    noisy = ratio_ci([1.0, 5.0, 3.0, 7.0], [1.0, 2.0, 2.0, 3.0])
+
+    assert (exact.mean, exact.half_width) == (2.0, 0.0)
+    assert noisy.mean == pytest.approx(16 / 8)
+    assert noisy.half_width > 0
+
+
+def test_strategy_labels_show_parameters_and_tuning_objective() -> None:
+    assert strategy_label("A-S (mean)") == "A–S γ = 0.01, τ = 10 · tuned for mean PnL"
+    assert strategy_label("Skew", multiline=True) == (
+        "Skew\nh = 2, α = 0.5\ntuned for PnL mean/std"
+    )

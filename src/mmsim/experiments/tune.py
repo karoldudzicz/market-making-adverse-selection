@@ -5,8 +5,9 @@ using a one-standard-error rule so that grid noise does not drive the choice:
 
 * ``MEAN`` (risk-neutral): among points whose mean PnL is within one standard error of the
   best (on paired per-seed differences), take the one with the lowest PnL standard deviation.
-* ``SHARPE`` (risk-adjusted): among points whose Sharpe ratio across seeds (mean / std of run
-  PnL) is within one standard error of the best, take the one with the highest mean PnL.
+* ``MEAN_OVER_STD`` (risk-adjusted): among points whose ratio of mean to standard deviation of
+  run PnL across seeds is within one standard error of the best, take the one with the highest
+  mean PnL.
 """
 
 import math
@@ -47,7 +48,7 @@ class Objective(Enum):
     """Tuning objective."""
 
     MEAN = "mean"
-    SHARPE = "sharpe"
+    MEAN_OVER_STD = "mean_over_std"
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,15 +73,15 @@ class GridPoint:
     mean_abs_position: float
 
     @property
-    def sharpe(self) -> float:
+    def mean_over_std(self) -> float:
         """Mean over standard deviation of run PnL; zero for a point that never trades."""
         std = float(self.pnl.std(ddof=1))
         return float(self.pnl.mean()) / std if std > 0 else 0.0
 
     @property
-    def sharpe_se(self) -> float:
-        """Standard error of the Sharpe ratio, sqrt((1 + S^2 / 2) / n) (Lo, 2002)."""
-        return math.sqrt((1 + self.sharpe**2 / 2) / self.pnl.size)
+    def mean_over_std_se(self) -> float:
+        """Asymptotic standard error of the mean/std ratio S for normal PnL, sqrt((1 + S^2/2)/n)."""
+        return math.sqrt((1 + self.mean_over_std**2 / 2) / self.pnl.size)
 
 
 @dataclass(frozen=True, slots=True)
@@ -113,8 +114,12 @@ def tied_with_best(points: Sequence[GridPoint], objective: Objective) -> list[Gr
     if objective is Objective.MEAN:
         best = max(points, key=lambda point: point.pnl.mean())
         return [point for point in points if _mean_within_one_se(best, point)]
-    leader = max(points, key=lambda point: point.sharpe)
-    return [point for point in points if point.sharpe >= leader.sharpe - leader.sharpe_se]
+    leader = max(points, key=lambda point: point.mean_over_std)
+    return [
+        point
+        for point in points
+        if point.mean_over_std >= leader.mean_over_std - leader.mean_over_std_se
+    ]
 
 
 def select(points: Sequence[GridPoint], objective: Objective) -> GridPoint:
@@ -195,8 +200,8 @@ def _write_grid(path: Path, points: Sequence[GridPoint], candidates: Sequence[Gr
         "mean_pnl",
         "pnl_ci95",
         "std_pnl",
-        "sharpe",
-        "sharpe_se",
+        "pnl_mean_over_std",
+        "pnl_mean_over_std_se",
         "fills_per_run",
         "mean_abs_position",
     ]
@@ -210,8 +215,8 @@ def _write_grid(path: Path, points: Sequence[GridPoint], candidates: Sequence[Gr
             pnl.mean,
             pnl.half_width,
             float(point.pnl.std(ddof=1)),
-            point.sharpe,
-            point.sharpe_se,
+            point.mean_over_std,
+            point.mean_over_std_se,
             point.fills,
             point.mean_abs_position,
         ]

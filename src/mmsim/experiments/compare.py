@@ -5,20 +5,25 @@ Run with ``python -m mmsim.experiments.compare``; all runs use the report seeds.
 
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 from matplotlib.axes import Axes
+from numpy.typing import NDArray
 
 from mmsim.config import REPORTED_STRATEGIES, SimulationConfig
 from mmsim.engine import SimulationResult, simulate
 from mmsim.experiments import plotting
 from mmsim.experiments.common import (
+    COUNTERPARTIES,
     DEFAULT_MODEL,
     PNL_COMPONENTS,
     REPORT_SEEDS,
     RESULTS_DIR,
+    Estimate,
     column,
     mean_ci,
+    ratio_ci,
     run_groups,
     write_csv,
 )
@@ -29,16 +34,36 @@ from mmsim.strategies import build_strategy
 
 type StrategyRuns = dict[str, list[RunMetrics]]
 
-BASELINE = "Naive"
+PAIRED_COMPARISONS = (
+    ("Skew", "Naive"),
+    ("A-S (mean/std)", "Naive"),
+    ("A-S (mean)", "Naive"),
+    ("A-S (mean/std)", "Skew"),
+)
 DECOMPOSITION: dict[str, tuple[str, Callable[[RunMetrics], float]]] = {
-    "noise_edge": ("edge from noise takers", PNL_COMPONENTS["noise_edge"]),
-    "informed_edge": ("edge from informed takers", PNL_COMPONENTS["informed_edge"]),
+    "noise_edge": (f"edge from {COUNTERPARTIES[TakerType.NOISE]}", PNL_COMPONENTS["noise_edge"]),
+    "informed_edge": (
+        f"edge from {COUNTERPARTIES[TakerType.INFORMED]}",
+        PNL_COMPONENTS["informed_edge"],
+    ),
     "inventory": ("inventory PnL", PNL_COMPONENTS["inventory"]),
 }
 JUMP_PARTS: dict[str, Callable[[RunMetrics], float]] = {
     "informed_edge_after_jumps": lambda run: run.jumps.informed_edge,
     "inventory_from_jumps": lambda run: run.jumps.inventory,
 }
+_EDGE_AND_FILLS: dict[
+    TakerType, tuple[Callable[[RunMetrics], float], Callable[[RunMetrics], float]]
+] = {
+    TakerType.NOISE: (PNL_COMPONENTS["noise_edge"], lambda run: run.n_noise_fills),
+    TakerType.INFORMED: (PNL_COMPONENTS["informed_edge"], lambda run: run.n_informed_fills),
+}
+
+
+def edge_per_fill(runs: list[RunMetrics], taker: TakerType) -> Estimate:
+    """Edge per lot on fills against one counterparty type, pooled over runs."""
+    edge, fills = _EDGE_AND_FILLS[taker]
+    return ratio_ci(column(runs, edge), column(runs, fills))
 
 
 def run_comparison(
@@ -56,7 +81,7 @@ def write_summary(results: StrategyRuns, out_dir: Path) -> None:
         "mean_pnl",
         "pnl_ci95",
         "std_pnl",
-        "sharpe",
+        "pnl_mean_over_std",
         "median_pnl",
         "p05_pnl",
         "p95_pnl",
@@ -89,15 +114,13 @@ def write_summary(results: StrategyRuns, out_dir: Path) -> None:
         )
     write_csv(out_dir / "e2_strategy_summary.csv", header, rows)
 
-    baseline = column(results[BASELINE], PNL_COMPONENTS["pnl"])
     difference_rows = []
-    for label, runs in results.items():
-        if label == BASELINE:
-            continue
-        difference = column(runs, PNL_COMPONENTS["pnl"]) - baseline
+    for label, baseline in PAIRED_COMPARISONS:
+        pnl = column(results[label], PNL_COMPONENTS["pnl"])
+        difference = pnl - column(results[baseline], PNL_COMPONENTS["pnl"])
         estimate = mean_ci(difference)
         difference_rows.append(
-            [label, BASELINE, estimate.mean, estimate.half_width, float(np.mean(difference > 0))]
+            [label, baseline, estimate.mean, estimate.half_width, float(np.mean(difference > 0))]
         )
     write_csv(
         out_dir / "e2_paired_differences.csv",
@@ -114,7 +137,7 @@ def plot_distribution(results: StrategyRuns, out_dir: Path) -> None:
     data = [column(results[label], PNL_COMPONENTS["pnl"]) for label in labels]
     boxes = axes.boxplot(
         data,
-        tick_labels=labels,
+        tick_labels=[plotting.strategy_label(label, multiline=True) for label in labels],
         whis=(5, 95),
         showfliers=False,
         showmeans=True,
@@ -155,69 +178,106 @@ def plot_distribution(results: StrategyRuns, out_dir: Path) -> None:
 
 
 def write_decomposition(results: StrategyRuns, out_dir: Path) -> None:
-    """Write E3: mean PnL components per strategy, including the parts tied to jumps."""
+    """Write E3: mean PnL components and edge per fill per strategy, with jump attribution."""
     parts = {**PNL_COMPONENTS, **JUMP_PARTS}
     rows = []
     for label, runs in results.items():
         for name, metric in parts.items():
             estimate = mean_ci(column(runs, metric))
             rows.append([label, name, estimate.mean, estimate.half_width])
+        for taker in TakerType:
+            estimate = edge_per_fill(runs, taker)
+            rows.append([label, f"{taker.value}_edge_per_fill", estimate.mean, estimate.half_width])
     write_csv(out_dir / "e3_pnl_decomposition.csv", ["strategy", "component", "mean", "ci95"], rows)
 
 
 def plot_decomposition(results: StrategyRuns, out_dir: Path) -> None:
-    """Plot E3: PnL components per strategy as grouped bars with the total marked."""
-    figure = plotting.new_figure(9, 4.8)
-    axes = figure.subplots()
+    """Plot E3: PnL components per run and edge per fill by counterparty type."""
+    figure = plotting.new_figure(17, 5.8)
+    per_run, per_fill = figure.subplots(1, 2, width_ratios=(1.5, 1.2))
     labels = list(results)
     positions = np.arange(len(labels))
-    width = 0.26
+    tick_labels = [plotting.strategy_label(label, multiline=True) for label in labels]
     for offset, ((name, metric), color) in enumerate(
         zip(DECOMPOSITION.values(), plotting.SERIES, strict=False)
     ):
         estimates = [mean_ci(column(results[label], metric)) for label in labels]
-        x = positions + (offset - 1) * width
-        means = [estimate.mean for estimate in estimates]
-        axes.bar(x, means, width * 0.92, color=color, label=name)
-        axes.errorbar(
-            x,
-            means,
-            yerr=[estimate.half_width for estimate in estimates],
-            fmt="none",
-            ecolor=plotting.INK_SECONDARY,
-            capsize=2,
-            linewidth=1,
-        )
-        for xi, estimate in zip(x, estimates, strict=True):
-            mean = estimate.mean
-            axes.annotate(
-                f"{mean:.0f}",
-                (xi, mean + (estimate.half_width if mean >= 0 else -estimate.half_width)),
-                xytext=(0, 3 if mean >= 0 else -11),
-                textcoords="offset points",
-                ha="center",
-                fontsize=7,
-                color=plotting.INK_SECONDARY,
-            )
+        _labelled_bars(per_run, positions + (offset - 1) * 0.26, 0.24, estimates, color, name, 0)
     totals = [mean_ci(column(results[label], PNL_COMPONENTS["pnl"])) for label in labels]
-    axes.plot(
+    per_run.plot(
         positions,
         [total.mean for total in totals],
         "D",
         color=plotting.INK,
         markeredgecolor=plotting.SURFACE,
-        markersize=7,
+        markersize=8,
         label="total PnL",
     )
-    axes.axhline(0, color=plotting.AXIS, linewidth=1.0)
-    axes.set_xticks(positions, labels)
-    axes.set_title(
-        f"Where the PnL comes from: mean per run over {len(results[labels[0]])} seeds "
+    for position, total in zip(positions, totals, strict=True):
+        per_run.annotate(
+            f"{total.mean:.0f}",
+            (position, total.mean),
+            xytext=(7, 0),
+            textcoords="offset points",
+            va="center",
+            fontsize=8,
+            fontweight="semibold",
+            color=plotting.INK,
+        )
+    per_run.axhline(0, color=plotting.AXIS, linewidth=1.0)
+    per_run.set_xticks(positions, tick_labels, fontsize=8)
+    per_run.set_title(
+        f"PnL decomposition: mean per run over {len(results[labels[0]])} seeds "
         f"(π = {DEFAULT_MODEL.takers.informed_share}, L = 0, 95% CI)"
     )
-    axes.set_ylabel("ticks per run")
-    figure.legend(loc="outside lower center", ncols=4)
+    per_run.set_ylabel("ticks per run")
+    handles, names = per_run.get_legend_handles_labels()
+    figure.legend(handles, names, loc="outside lower center", ncols=4)
+
+    for offset, (taker, color) in enumerate(zip(TakerType, plotting.SERIES, strict=False)):
+        estimates = [edge_per_fill(results[label], taker) for label in labels]
+        x = positions + (offset - 0.5) * 0.38
+        _labelled_bars(per_fill, x, 0.34, estimates, color, COUNTERPARTIES[taker], 2)
+    per_fill.axhline(0, color=plotting.AXIS, linewidth=1.0)
+    per_fill.set_xticks(positions, tick_labels, fontsize=8)
+    per_fill.set_title("Edge per fill by counterparty type (95% CI)")
+    per_fill.set_ylabel("ticks per lot")
+    low, high = per_fill.get_ylim()
+    per_fill.set_ylim(low - 0.15, high + 0.3)
     plotting.save(figure, out_dir / "e3_pnl_decomposition.png")
+
+
+def _labelled_bars(
+    axes: Axes,
+    x: NDArray[np.floating[Any]],
+    width: float,
+    estimates: list[Estimate],
+    color: str,
+    name: str,
+    decimals: int,
+) -> None:
+    means = [estimate.mean for estimate in estimates]
+    axes.bar(x, means, width, color=color, label=name)
+    axes.errorbar(
+        x,
+        means,
+        yerr=[estimate.half_width for estimate in estimates],
+        fmt="none",
+        ecolor=plotting.INK_SECONDARY,
+        capsize=2,
+        linewidth=1,
+    )
+    for xi, estimate in zip(x, estimates, strict=True):
+        above = estimate.mean >= 0
+        axes.annotate(
+            f"{estimate.mean:.{decimals}f}",
+            (xi, estimate.mean + (estimate.half_width if above else -estimate.half_width)),
+            xytext=(0, 3 if above else -11),
+            textcoords="offset points",
+            ha="center",
+            fontsize=7,
+            color=plotting.INK_SECONDARY,
+        )
 
 
 def markout_curves(results: StrategyRuns) -> dict[str, dict[TakerType, list[float]]]:
@@ -226,20 +286,12 @@ def markout_curves(results: StrategyRuns) -> dict[str, dict[TakerType, list[floa
     Horizon 0 is the edge at the fill. Per-run means are pooled with weights equal to the run's
     number of fills against that counterparty type.
     """
-    edges = {
-        TakerType.NOISE: PNL_COMPONENTS["noise_edge"],
-        TakerType.INFORMED: PNL_COMPONENTS["informed_edge"],
-    }
-    counts: dict[TakerType, Callable[[RunMetrics], float]] = {
-        TakerType.NOISE: lambda run: run.n_noise_fills,
-        TakerType.INFORMED: lambda run: run.n_informed_fills,
-    }
     curves: dict[str, dict[TakerType, list[float]]] = {}
     for label, runs in results.items():
         curves[label] = {}
         for taker in TakerType:
-            weights = column(runs, counts[taker])
-            curve = [float(column(runs, edges[taker]).sum() / weights.sum())]
+            weights = column(runs, _EDGE_AND_FILLS[taker][1])
+            curve = [edge_per_fill(runs, taker).mean]
             for horizon in MARKOUT_HORIZONS:
                 values = np.array([run.markouts[taker][horizon] for run in runs])
                 usable = ~np.isnan(values)
@@ -271,21 +323,29 @@ def plot_markouts(results: StrategyRuns, out_dir: Path) -> None:
     panels = figure.subplots(1, len(TakerType))
     for axes, taker in zip(panels, TakerType, strict=True):
         for (label, by_taker), color in zip(curves.items(), plotting.SERIES, strict=False):
-            axes.plot(horizons, by_taker[taker], color=color, marker="o", markersize=4, label=label)
+            axes.plot(
+                horizons,
+                by_taker[taker],
+                color=color,
+                marker="o",
+                markersize=4,
+                label=plotting.strategy_label(label),
+            )
         axes.axhline(0, color=plotting.AXIS, linewidth=1.0)
         axes.set_xscale("symlog", linthresh=1)
         axes.set_xlim(0, 120)
         axes.set_xticks(horizons, [str(h) for h in horizons])
-        axes.set_title(f"Markout s·(V(t+h) − P) per lot, fills against {taker.value} takers")
+        axes.set_title(f"Markout s·(V(t+h) − P) per lot, fills against {COUNTERPARTIES[taker]}")
         axes.set_xlabel("horizon h (steps after the fill)")
         axes.set_ylabel("ticks per lot")
-    panels[0].legend(loc="lower right")
+    handles, names = panels[0].get_legend_handles_labels()
+    figure.legend(handles, names, loc="outside lower center", ncols=2)
     plotting.save(figure, out_dir / "e6_markouts.png")
 
 
 def plot_example_run(out_dir: Path = RESULTS_DIR, seed: int = REPORT_SEEDS.start) -> None:
-    """Plot E1: one A-S (Sharpe) run around a jump, with positions and PnL against Naive."""
-    focus, contrast = "A-S (Sharpe)", "Naive"
+    """Plot E1: one A-S (mean/std) run around a jump, with positions and PnL against Naive."""
+    focus, contrast = "A-S (mean/std)", "Naive"
     colors = dict(zip(REPORTED_STRATEGIES, plotting.SERIES, strict=False))
     runs = {
         label: simulate(DEFAULT_MODEL, build_strategy(REPORTED_STRATEGIES[label]), seed)
@@ -300,16 +360,19 @@ def plot_example_run(out_dir: Path = RESULTS_DIR, seed: int = REPORT_SEEDS.start
     figure = plotting.new_figure(11, 8.5)
     prices, positions, pnl = figure.subplots(3, 1, height_ratios=(1.4, 1, 1))
     _plot_quotes_window(prices, result, window, colors[focus])
-    prices.set_title(f"{focus} around a price jump (seed {seed}, step {jump})")
+    prices.set_title(
+        f"{plotting.strategy_label(focus)}: quotes around a price jump (seed {seed}, step {jump})"
+    )
     steps = np.arange(n_steps + 1)
     for label, run in runs.items():
-        positions.plot(steps, run.position, color=colors[label], linewidth=1.0, label=label)
-        pnl.plot(steps, run.cash + run.position * run.values, color=colors[label], label=label)
+        name = plotting.strategy_label(label)
+        positions.plot(steps, run.position, color=colors[label], linewidth=1.0, label=name)
+        pnl.plot(steps, run.cash + run.position * run.values, color=colors[label], label=name)
     for axes in (positions, pnl):
         axes.axvspan(*window, color=plotting.GRID, alpha=0.6, linewidth=0)
         axes.axhline(0, color=plotting.AXIS, linewidth=1.0)
         axes.set_xlim(0, n_steps)
-        axes.legend(loc="upper left", bbox_to_anchor=(1.01, 1.0))
+        axes.legend(loc="best")
     positions.set_title("Position q (shaded: window above)")
     positions.set_ylabel("lots")
     pnl.set_title("Cumulative PnL marked to V")

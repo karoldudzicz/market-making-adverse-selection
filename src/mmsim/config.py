@@ -112,7 +112,7 @@ class MakerConfig:
 class NaiveConfig:
     """Symmetric quotes around the background mid: bid = mid - h, ask = mid + h.
 
-    Default values are tuned on seeds 0-199 (Sharpe objective, `results/tuning_naive.csv`).
+    Default values are tuned on seeds 0-199 (PnL mean/std objective, `results/tuning_naive.csv`).
 
     Attributes
     ----------
@@ -127,7 +127,7 @@ class NaiveConfig:
 class InventorySkewConfig:
     """Symmetric quotes shifted against the position: mid - h - alpha*q and mid + h - alpha*q.
 
-    Default values are tuned on seeds 0-199 (Sharpe objective, `results/tuning_skew.csv`).
+    Default values are tuned on seeds 0-199 (PnL mean/std objective, `results/tuning_skew.csv`).
 
     Attributes
     ----------
@@ -145,7 +145,7 @@ class InventorySkewConfig:
 class AvellanedaStoikovConfig:
     """Avellaneda-Stoikov (2008) quotes.
 
-    ``gamma`` and ``horizon`` defaults are tuned on seeds 0-199 (Sharpe objective,
+    ``gamma`` and ``horizon`` defaults are tuned on seeds 0-199 (PnL mean/std objective,
     `results/tuning_avellaneda_stoikov.csv`); ``k`` is calibrated in E0
     (`results/e0_intensity_fit.csv`).
 
@@ -190,12 +190,20 @@ class SimulationConfig:
 
 
 AVELLANEDA_STOIKOV_MEAN_TUNED = AvellanedaStoikovConfig(gamma=0.01, horizon=10.0)
-"""Avellaneda-Stoikov tuned for mean PnL instead of the Sharpe ratio (risk-neutral)."""
+"""Avellaneda-Stoikov tuned for mean PnL instead of PnL mean/std (risk-neutral)."""
 
 REPORTED_STRATEGIES: dict[str, StrategyConfig] = {
     "Naive": NaiveConfig(),
     "Skew": InventorySkewConfig(),
-    "A-S (Sharpe)": AvellanedaStoikovConfig(),
+    "A-S (mean/std)": AvellanedaStoikovConfig(),
     "A-S (mean)": AVELLANEDA_STOIKOV_MEAN_TUNED,
 }
 """Strategies compared in the experiments, keyed by display label."""
+
+TUNING_OBJECTIVES: dict[str, str] = {
+    "Naive": "PnL mean/std",
+    "Skew": "PnL mean/std",
+    "A-S (mean/std)": "PnL mean/std",
+    "A-S (mean)": "mean PnL",
+}
+"""Objective each reported strategy was tuned for."""

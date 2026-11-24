@@ -23,11 +23,11 @@ def check_tuned_parameters(fit: IntensityFit, selections: dict[Objective, TunedS
     configured_k = AvellanedaStoikovConfig().k
     if not math.isclose(fit.k, configured_k, rel_tol=1e-5):
         raise RuntimeError(f"E0 gives k = {fit.k:.6g}, config.py has k = {configured_k}")
-    sharpe, mean = selections[Objective.SHARPE], selections[Objective.MEAN]
+    risk_adjusted, mean = selections[Objective.MEAN_OVER_STD], selections[Objective.MEAN]
     tuned: dict[str, StrategyConfig] = {
-        "Naive": sharpe.naive,
-        "Skew": sharpe.skew,
-        "A-S (Sharpe)": replace(sharpe.avellaneda_stoikov, k=configured_k),
+        "Naive": risk_adjusted.naive,
+        "Skew": risk_adjusted.skew,
+        "A-S (mean/std)": replace(risk_adjusted.avellaneda_stoikov, k=configured_k),
         "A-S (mean)": replace(mean.avellaneda_stoikov, k=configured_k),
     }
     stale = {

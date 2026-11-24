@@ -1,11 +1,19 @@
 """Shared figure style; figures are drawn on the Agg canvas without pyplot."""
 
 from pathlib import Path
-from typing import Any
+from typing import Any, assert_never
 
 import matplotlib
 import matplotlib.style
 from matplotlib.figure import Figure
+
+from mmsim.config import (
+    REPORTED_STRATEGIES,
+    TUNING_OBJECTIVES,
+    AvellanedaStoikovConfig,
+    InventorySkewConfig,
+    NaiveConfig,
+)
 
 INK = "#0b0b0b"
 INK_SECONDARY = "#52514e"
@@ -58,6 +66,25 @@ def sequential(count: int) -> list[str]:
         return [_BLUE_RAMP[-1]]
     last = len(_BLUE_RAMP) - 1
     return [_BLUE_RAMP[round(i * last / (count - 1))] for i in range(count)]
+
+
+def strategy_label(name: str, multiline: bool = False) -> str:
+    """Display label of a reported strategy: family, parameters and tuning objective."""
+    config = REPORTED_STRATEGIES[name]
+    match config:
+        case NaiveConfig():
+            family, parameters = "Naive", f"h = {config.half_spread:g}"
+        case InventorySkewConfig():
+            family, parameters = "Skew", f"h = {config.half_spread:g}, α = {config.skew:g}"
+        case AvellanedaStoikovConfig():
+            horizon = "T − t" if config.horizon is None else f"{config.horizon:g}"
+            family, parameters = "A–S", f"γ = {config.gamma:g}, τ = {horizon}"
+        case _:
+            assert_never(config)
+    objective = f"tuned for {TUNING_OBJECTIVES[name]}"
+    if multiline:
+        return f"{family}\n{parameters}\n{objective}"
+    return f"{family} {parameters} · {objective}"
 
 
 def new_figure(width: float, height: float) -> Figure:

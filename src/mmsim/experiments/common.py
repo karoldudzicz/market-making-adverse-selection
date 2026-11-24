@@ -13,7 +13,7 @@ from numpy.typing import ArrayLike
 
 from mmsim.config import SimulationConfig, StrategyConfig
 from mmsim.engine import simulate
-from mmsim.market import FloatArray
+from mmsim.market import FloatArray, TakerType
 from mmsim.metrics import RunMetrics, compute_metrics
 from mmsim.strategies import build_strategy
 
@@ -22,6 +22,7 @@ REPORT_SEEDS = range(1000, 1500)
 RESULTS_DIR = Path("results")
 DEFAULT_MODEL = SimulationConfig()
 Z_95 = 1.959963984540054
+COUNTERPARTIES = {TakerType.NOISE: "noise takers", TakerType.INFORMED: "informed takers"}
 
 
 @dataclass(frozen=True, slots=True)
@@ -102,6 +103,19 @@ def mean_ci(values: ArrayLike) -> Estimate:
     sample = np.asarray(values, dtype=np.float64)
     half_width = Z_95 * float(sample.std(ddof=1)) / math.sqrt(sample.size)
     return Estimate(float(sample.mean()), half_width)
+
+
+def ratio_ci(numerators: ArrayLike, denominators: ArrayLike) -> Estimate:
+    """Pooled ratio sum(x) / sum(y) over runs with a delta-method 95% confidence interval.
+
+    Used for per-fill quantities such as edge per fill, where runs differ in fill counts.
+    """
+    x = np.asarray(numerators, dtype=np.float64)
+    y = np.asarray(denominators, dtype=np.float64)
+    ratio = float(x.sum() / y.sum())
+    residual = x - ratio * y
+    half_width = Z_95 * float(residual.std(ddof=1)) * math.sqrt(x.size) / float(y.sum())
+    return Estimate(ratio, half_width)
 
 
 def with_informed_share(config: SimulationConfig, informed_share: float) -> SimulationConfig:
