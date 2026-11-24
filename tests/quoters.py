@@ -5,14 +5,6 @@ import math
 from mmsim.strategies import Quote, QuoteState
 
 
-class SymmetricQuoter:
-    def __init__(self, half_spread: float) -> None:
-        self.half_spread = half_spread
-
-    def quote(self, state: QuoteState) -> Quote:
-        return math.floor(state.mid - self.half_spread), math.ceil(state.mid + self.half_spread)
-
-
 class NoQuotes:
     def quote(self, state: QuoteState) -> Quote:
         return None, None

@@ -4,13 +4,15 @@ from dataclasses import replace
 import numpy as np
 import pytest
 
-from mmsim.config import MakerConfig, SimulationConfig, TakerConfig
+from mmsim.config import MakerConfig, NaiveConfig, SimulationConfig, TakerConfig
 from mmsim.engine import MarketMaker, SimulationResult, quote_state, simulate
 from mmsim.market import FIRST_BACKGROUND_ID, INFORMED_TAKER_ID, MARKET_MAKER_ID, NOISE_TAKER_ID
 from mmsim.orderbook import OrderBook, Side
-from quoters import AggressiveBid, NoQuotes, StepEncodingBid, SymmetricQuoter
+from mmsim.strategies import Naive
+from quoters import AggressiveBid, NoQuotes, StepEncodingBid
 
 SHORT = SimulationConfig(n_steps=1_000)
+NAIVE = Naive(NaiveConfig(half_spread=1.0))
 
 
 def with_latency(config: SimulationConfig, latency: int) -> SimulationConfig:
@@ -27,21 +29,19 @@ def assert_same_run(a: SimulationResult, b: SimulationResult) -> None:
 
 
 def test_same_seed_reproduces_run() -> None:
-    assert_same_run(
-        simulate(SHORT, SymmetricQuoter(1), seed=11), simulate(SHORT, SymmetricQuoter(1), seed=11)
-    )
+    assert_same_run(simulate(SHORT, NAIVE, seed=11), simulate(SHORT, NAIVE, seed=11))
 
 
 def test_different_seeds_give_different_runs() -> None:
-    a = simulate(SHORT, SymmetricQuoter(1), seed=11)
-    b = simulate(SHORT, SymmetricQuoter(1), seed=12)
+    a = simulate(SHORT, NAIVE, seed=11)
+    b = simulate(SHORT, NAIVE, seed=12)
 
     assert not np.array_equal(a.values, b.values)
     assert a.trades != b.trades
 
 
 def test_market_randomness_does_not_depend_on_strategy() -> None:
-    a = simulate(SHORT, SymmetricQuoter(1), seed=5)
+    a = simulate(SHORT, NAIVE, seed=5)
     b = simulate(SHORT, NoQuotes(), seed=5)
 
     np.testing.assert_array_equal(a.values, b.values)
@@ -50,7 +50,7 @@ def test_market_randomness_does_not_depend_on_strategy() -> None:
 
 @pytest.mark.parametrize("latency", [0, 3])
 def test_accounting_is_consistent_across_participants(latency: int) -> None:
-    result = simulate(with_latency(SHORT, latency), SymmetricQuoter(1), seed=2)
+    result = simulate(with_latency(SHORT, latency), NAIVE, seed=2)
 
     positions: defaultdict[int, int] = defaultdict(int)
     cash: defaultdict[int, int] = defaultdict(int)
@@ -72,7 +72,7 @@ def test_accounting_is_consistent_across_participants(latency: int) -> None:
 
 
 def test_position_path_matches_fills() -> None:
-    result = simulate(SHORT, SymmetricQuoter(1), seed=4)
+    result = simulate(SHORT, NAIVE, seed=4)
 
     changes = np.zeros(SHORT.n_steps + 1, dtype=np.int64)
     for fill in result.fills:

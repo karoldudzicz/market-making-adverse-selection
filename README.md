@@ -15,6 +15,8 @@ Work in progress.
 - Background liquidity: 4 providers, each posting a 1-lot order per side with probability 0.25 per step at a uniform depth of 2-10 ticks from the rounded reference. Default π = 0.2. The book starts empty and fills within the first steps; there is no warm-up period.
 - The market maker keeps a resting quote whose price is unchanged instead of cancelling and re-posting it, so it does not lose queue priority. The position limit is checked when a quote is activated, against the position at that moment.
 - Markouts at horizon h exclude fills with t + h beyond the end of the run.
+- Strategy quotes are rounded outward to whole ticks (bid down, ask up), with a 1e-9 tolerance so float noise does not widen a quote by a tick. If rounding leaves bid >= ask, the ask is set to bid + 1.
+- Avellaneda-Stoikov uses a constant rolling horizon τ, tuned together with γ, instead of τ = T - t. With T = 5,000 steps and σ = 0.5, σ²(T - t) is about 1,250 at the start of a run, so the original quotes would be extremely wide and skewed early and almost unskewed at the end, and behaviour would depend mainly on the time within the run. The original form is available as `AvellanedaStoikovConfig(horizon=None)`.
 
 ## How to run
 

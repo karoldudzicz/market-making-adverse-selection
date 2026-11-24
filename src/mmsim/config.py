@@ -109,6 +109,68 @@ class MakerConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class NaiveConfig:
+    """Symmetric quotes around the background mid: bid = mid - h, ask = mid + h.
+
+    Default values are provisional until parameter tuning.
+
+    Attributes
+    ----------
+    half_spread : float
+        Half-spread h in ticks.
+    """
+
+    half_spread: float = 1.0
+
+
+@dataclass(frozen=True, slots=True)
+class InventorySkewConfig:
+    """Symmetric quotes shifted against the position: mid - h - alpha*q and mid + h - alpha*q.
+
+    Default values are provisional until parameter tuning.
+
+    Attributes
+    ----------
+    half_spread : float
+        Half-spread h in ticks.
+    skew : float
+        Skew alpha in ticks per lot of position.
+    """
+
+    half_spread: float = 1.0
+    skew: float = 0.1
+
+
+@dataclass(frozen=True, slots=True)
+class AvellanedaStoikovConfig:
+    """Avellaneda-Stoikov (2008) quotes.
+
+    Default values are provisional until parameter tuning and calibration of ``k``.
+
+    Attributes
+    ----------
+    gamma : float
+        Risk aversion, positive.
+    horizon : float or None
+        Rolling horizon tau in steps; ``None`` uses the time to the end of the run, T - t,
+        as in the original model.
+    k : float
+        Decay rate of the fill intensity A * exp(-k * delta), per tick; positive.
+    """
+
+    gamma: float = 0.01
+    horizon: float | None = 100.0
+    k: float = 1.0
+
+    def __post_init__(self) -> None:
+        if self.gamma <= 0 or self.k <= 0:
+            raise ValueError(f"gamma and k must be positive, got {self.gamma} and {self.k}")
+
+
+type StrategyConfig = NaiveConfig | InventorySkewConfig | AvellanedaStoikovConfig
+
+
+@dataclass(frozen=True, slots=True)
 class SimulationConfig:
     """Full configuration of one simulation run."""
 

@@ -5,12 +5,20 @@ import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from mmsim.config import MakerConfig, SimulationConfig, TakerConfig
+from mmsim.config import (
+    AvellanedaStoikovConfig,
+    InventorySkewConfig,
+    MakerConfig,
+    NaiveConfig,
+    SimulationConfig,
+    StrategyConfig,
+    TakerConfig,
+)
 from mmsim.engine import Fill, SimulationResult, simulate
 from mmsim.market import TakerType
 from mmsim.metrics import compute_metrics, markouts, pnl_breakdown
 from mmsim.orderbook import Side
-from quoters import SymmetricQuoter
+from mmsim.strategies import Naive, build_strategy
 
 
 def handmade_result() -> SimulationResult:
@@ -68,10 +76,18 @@ def test_run_metrics_of_handmade_run() -> None:
     seed=st.integers(min_value=0, max_value=2**32 - 1),
     informed_share=st.floats(min_value=0.0, max_value=1.0),
     latency=st.integers(min_value=0, max_value=10),
-    half_spread=st.sampled_from([0.0, 0.5, 1.0, 2.0, 4.0]),
+    strategy=st.sampled_from(
+        [
+            NaiveConfig(half_spread=0.0),
+            NaiveConfig(half_spread=2.0),
+            InventorySkewConfig(half_spread=1.0, skew=0.3),
+            AvellanedaStoikovConfig(),
+            AvellanedaStoikovConfig(horizon=None),
+        ]
+    ),
 )
 def test_pnl_decomposition_is_an_exact_identity(
-    seed: int, informed_share: float, latency: int, half_spread: float
+    seed: int, informed_share: float, latency: int, strategy: StrategyConfig
 ) -> None:
     config = SimulationConfig(
         n_steps=400,
@@ -79,7 +95,7 @@ def test_pnl_decomposition_is_an_exact_identity(
         maker=MakerConfig(latency=latency),
     )
 
-    breakdown = pnl_breakdown(simulate(config, SymmetricQuoter(half_spread), seed))
+    breakdown = pnl_breakdown(simulate(config, build_strategy(strategy), seed))
 
     parts = breakdown.noise_edge + breakdown.informed_edge + breakdown.inventory
     assert breakdown.total == pytest.approx(parts, abs=1e-6)
@@ -88,7 +104,7 @@ def test_pnl_decomposition_is_an_exact_identity(
 def test_fills_split_by_counterparty_type() -> None:
     config = replace(SimulationConfig(n_steps=2_000), takers=TakerConfig(informed_share=0.5))
 
-    metrics = compute_metrics(simulate(config, SymmetricQuoter(1), seed=0))
+    metrics = compute_metrics(simulate(config, Naive(NaiveConfig(half_spread=1.0)), seed=0))
 
     assert metrics.n_noise_fills > 0
     assert metrics.n_informed_fills > 0
