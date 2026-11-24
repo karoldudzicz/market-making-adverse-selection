@@ -1,0 +1,10 @@
+half_spread,mean_pnl,pnl_ci95,std_pnl,sharpe,sharpe_se,fills_per_run,mean_abs_position,tied_mean,selected_mean,tied_sharpe,selected_sharpe
+0,494.136,70.8341,511.104,0.9668,0.0856549,1218.84,9.88197,False,False,False,False
+0.5,667.173,75.4799,544.626,1.22501,0.0935502,1187.09,10.5113,False,False,False,False
+1,1089.51,68.2058,492.14,2.21383,0.131349,1085.03,9.5508,False,False,False,False
+1.5,1261.05,72.1279,520.439,2.42304,0.140278,871.19,9.40475,True,True,True,True
+2,1180.25,73.7243,531.958,2.21869,0.131554,617.35,9.23681,False,False,False,False
+2.5,875.222,65.4482,472.242,1.85333,0.116564,385.395,8.31884,False,False,False,False
+3,545.372,61.9143,446.743,1.22077,0.0934116,212.565,7.12879,False,False,False,False
+4,154.291,33.2222,239.715,0.643642,0.0776897,52.005,3.6771,False,False,False,False
+5,36.4807,18.4136,132.863,0.274573,0.0720311,14.615,2.1022,False,False,False,False

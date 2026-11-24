@@ -52,6 +52,7 @@ ignore = [
     "D105", # magic methods are self-explanatory
     "D107", # __init__ parameters are documented on the class (NumPy convention)
 ]
+allowed-confusables = ["−"] # typographic minus in figure labels
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["D"]

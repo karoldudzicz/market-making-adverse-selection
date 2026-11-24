@@ -16,7 +16,10 @@ Work in progress.
 - The market maker keeps a resting quote whose price is unchanged instead of cancelling and re-posting it, so it does not lose queue priority. The position limit is checked when a quote is activated, against the position at that moment.
 - Markouts at horizon h exclude fills with t + h beyond the end of the run.
 - Strategy quotes are rounded outward to whole ticks (bid down, ask up), with a 1e-9 tolerance so float noise does not widen a quote by a tick. If rounding leaves bid >= ask, the ask is set to bid + 1.
-- Avellaneda-Stoikov uses a constant rolling horizon τ, tuned together with γ, instead of τ = T - t. With T = 5,000 steps and σ = 0.5, σ²(T - t) is about 1,250 at the start of a run, so the original quotes would be extremely wide and skewed early and almost unskewed at the end, and behaviour would depend mainly on the time within the run. The original form is available as `AvellanedaStoikovConfig(horizon=None)`.
+- Avellaneda-Stoikov uses a constant rolling horizon τ, tuned together with γ, instead of τ = T - t. With T = 5,000 steps and σ = 0.5, σ²(T - t) is about 1,250 at the start of a run, so the original quotes would be extremely wide and skewed early and almost unskewed at the end, and behaviour would depend mainly on the time within the run. The original form is available as `AvellanedaStoikovConfig(horizon=None)`. With a rolling horizon, γ and τ enter the reservation price and the risk part of the spread only through γ·τ, and γ alone has a small effect on the intensity part, so grid points with the same γ·τ give near-identical results.
+- k is calibrated from naive runs with h from 0 to 6 ticks on the tuning seeds. The fill rate per quoted side per step is measured in half-tick buckets of distance from the background mid the quote was computed from. log(rate) = log A - kδ is fitted by least squares weighted by the fill count of each bucket (the variance of a log rate is about 1/fills), using buckets with at least 20 fills.
+- Confidence intervals are normal approximations (mean ± 1.96·s/√n). Strategy comparisons use per-seed paired differences.
+- Strategy parameters are tuned on seeds 0-199 at π = 0.2 and L = 0 with a one-standard-error rule, so that grid noise does not decide the choice. The full grids are in `results/tuning_*.csv`.
 
 ## How to run
 

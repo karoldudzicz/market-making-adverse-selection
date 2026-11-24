@@ -1,0 +1,3 @@
+cancel_through_reference,mean_abs_mid_error,p95_abs_mid_error,max_abs_mid_error,share_of_steps_error_above_5,jump_recovery_steps,isolated_jumps,market_trades_per_run,informed_trades_per_run,mm_fills_per_run,mm_informed_fills_per_run,mm_mean_pnl,mm_pnl_ci95
+on,1.36792,3.30634,21.547,0.013361,9,1317,1210.48,9.435,1085.03,48.14,1089.51,68.2058
+off,1.80853,5.18163,23.9719,0.052952,40,1317,1256.18,54.85,661.48,44.355,567.471,64.542
