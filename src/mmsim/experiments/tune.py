@@ -9,7 +9,6 @@ using a one-standard-error rule so that grid noise does not drive the choice:
   PnL) is within one standard error of the best, take the one with the highest mean PnL.
 """
 
-import csv
 import math
 from collections.abc import Sequence
 from dataclasses import astuple, dataclass, fields
@@ -28,12 +27,12 @@ from mmsim.config import (
 )
 from mmsim.experiments.common import (
     DEFAULT_MODEL,
+    PNL_COMPONENTS,
     RESULTS_DIR,
     TUNING_SEEDS,
-    RunSpec,
+    column,
     mean_ci,
-    parallel_map,
-    run_metrics,
+    run_groups,
     write_csv,
 )
 
@@ -97,20 +96,16 @@ def evaluate(
     strategies: Sequence[StrategyConfig], config: SimulationConfig, seeds: range
 ) -> list[GridPoint]:
     """Run every strategy on every seed and collect per-seed PnL."""
-    specs = [RunSpec(config, strategy, seed) for strategy in strategies for seed in seeds]
-    metrics = parallel_map(run_metrics, specs)
-    points = []
-    for index, strategy in enumerate(strategies):
-        runs = metrics[index * len(seeds) : (index + 1) * len(seeds)]
-        points.append(
-            GridPoint(
-                strategy=strategy,
-                pnl=np.array([run.pnl.total for run in runs]),
-                fills=float(np.mean([run.n_fills for run in runs])),
-                mean_abs_position=float(np.mean([run.mean_abs_position for run in runs])),
-            )
+    groups = run_groups([(config, strategy) for strategy in strategies], seeds)
+    return [
+        GridPoint(
+            strategy=strategy,
+            pnl=column(runs, PNL_COMPONENTS["pnl"]),
+            fills=float(column(runs, lambda run: run.n_fills).mean()),
+            mean_abs_position=float(column(runs, lambda run: run.mean_abs_position).mean()),
         )
-    return points
+        for strategy, runs in zip(strategies, groups, strict=True)
+    ]
 
 
 def tied_with_best(points: Sequence[GridPoint], objective: Objective) -> list[GridPoint]:
@@ -175,29 +170,6 @@ def tune(
     _write_grid(out_dir / "tuning_skew.csv", skew, skew)
     _write_grid(out_dir / "tuning_avellaneda_stoikov.csv", rolling + finite, rolling)
     return selections
-
-
-def load_selection(objective: Objective, out_dir: Path = RESULTS_DIR) -> TunedStrategies:
-    """Read the configurations selected under ``objective`` from the tuning CSVs."""
-
-    def selected_row(name: str) -> dict[str, str]:
-        with (out_dir / name).open(encoding="utf-8") as handle:
-            rows = list(csv.DictReader(handle))
-        (row,) = (r for r in rows if r[f"selected_{objective.value}"] == "True")
-        return row
-
-    naive = selected_row("tuning_naive.csv")
-    skew = selected_row("tuning_skew.csv")
-    stoikov = selected_row("tuning_avellaneda_stoikov.csv")
-    return TunedStrategies(
-        naive=NaiveConfig(float(naive["half_spread"])),
-        skew=InventorySkewConfig(float(skew["half_spread"]), float(skew["skew"])),
-        avellaneda_stoikov=AvellanedaStoikovConfig(
-            float(stoikov["gamma"]),
-            float(stoikov["horizon"]) if stoikov["horizon"] else None,
-            float(stoikov["k"]),
-        ),
-    )
 
 
 def _mean_within_one_se(best: GridPoint, point: GridPoint) -> bool:

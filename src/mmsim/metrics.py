@@ -11,6 +11,7 @@ from mmsim.engine import Fill, SimulationResult
 from mmsim.market import TakerType
 
 MARKOUT_HORIZONS = (1, 5, 20, 100)
+JUMP_WINDOW = 20
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,6 +39,23 @@ class PnLBreakdown:
 
 
 @dataclass(frozen=True, slots=True)
+class JumpAttribution:
+    """Parts of the PnL associated with jumps of the true value.
+
+    Attributes
+    ----------
+    informed_edge : float
+        Edge against informed takers on fills in the step of a jump or the
+        ``JUMP_WINDOW - 1`` steps after it.
+    inventory : float
+        Jump part of the inventory PnL, the sum over steps of q_{t-1} * J_t.
+    """
+
+    informed_edge: float
+    inventory: float
+
+
+@dataclass(frozen=True, slots=True)
 class RunMetrics:
     """Summary statistics of one run.
 
@@ -45,6 +63,8 @@ class RunMetrics:
     ----------
     pnl : PnLBreakdown
         PnL and its decomposition.
+    jumps : JumpAttribution
+        Parts of the PnL associated with jumps.
     n_fills, n_noise_fills, n_informed_fills : int
         Number of market maker fills, in total and by counterparty type.
     mean_abs_position : float
@@ -58,6 +78,7 @@ class RunMetrics:
     """
 
     pnl: PnLBreakdown
+    jumps: JumpAttribution
     n_fills: int
     n_noise_fills: int
     n_informed_fills: int
@@ -81,6 +102,24 @@ def pnl_breakdown(result: SimulationResult) -> PnLBreakdown:
     inventory = float(np.dot(result.position[:-1], np.diff(values)))
     total = float(result.cash[-1] + result.position[-1] * values[-1])
     return PnLBreakdown(total, edges[TakerType.NOISE], edges[TakerType.INFORMED], inventory)
+
+
+def jump_attribution(result: SimulationResult, window: int = JUMP_WINDOW) -> JumpAttribution:
+    """Attribute informed-flow losses and inventory PnL to jumps of the true value.
+
+    A fill counts as following a jump if it happens in the step of a jump or in the
+    ``window - 1`` steps after it.
+    """
+    after_jump = np.zeros(len(result.values) + window, dtype=bool)
+    for step in np.flatnonzero(result.jumps):
+        after_jump[step : step + window] = True
+    informed_edge = sum(
+        _signed_qty(fill) * (result.values[fill.step] - fill.price)
+        for fill in result.fills
+        if fill.counterparty is TakerType.INFORMED and after_jump[fill.step]
+    )
+    inventory = float(np.dot(result.position[:-1], result.jumps[1:]))
+    return JumpAttribution(float(informed_edge), inventory)
 
 
 def markouts(
@@ -110,6 +149,7 @@ def compute_metrics(result: SimulationResult) -> RunMetrics:
     mid_error = np.abs(result.market_mid[1:] - result.values[1:])
     return RunMetrics(
         pnl=pnl_breakdown(result),
+        jumps=jump_attribution(result),
         n_fills=len(result.fills),
         n_noise_fills=sum(f.counterparty is TakerType.NOISE for f in result.fills),
         n_informed_fills=sum(f.counterparty is TakerType.INFORMED for f in result.fills),

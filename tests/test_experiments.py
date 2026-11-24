@@ -1,12 +1,23 @@
 import math
+from dataclasses import replace
 
 import numpy as np
 import pytest
 
-from mmsim.config import NaiveConfig
-from mmsim.experiments.breakeven import Cell, breakeven_half_spread
+from mmsim.config import (
+    REPORTED_STRATEGIES,
+    AvellanedaStoikovConfig,
+    InventorySkewConfig,
+    NaiveConfig,
+)
+from mmsim.experiments.breakeven import (
+    HALF_SPREADS,
+    breakeven_half_spread,
+    optimal_half_spread,
+    swept_strategy,
+)
 from mmsim.experiments.calibrate import JUMP_BEFORE, fit_intensity, recovery_steps
-from mmsim.experiments.common import Estimate, mean_ci
+from mmsim.experiments.common import mean_ci
 from mmsim.experiments.tune import GridPoint, Objective, select
 
 
@@ -77,9 +88,28 @@ def test_sharpe_objective_prefers_higher_mean_among_tied_ratios() -> None:
     assert select([small, large, risky], Objective.SHARPE) is large
 
 
-def test_breakeven_half_spread_is_first_non_negative_grid_point() -> None:
-    def cell(h: float, pnl: float) -> Cell:
-        return Cell(0.5, NaiveConfig(h), Estimate(pnl, 1.0), Estimate(0.0, 0.0), fills=1.0)
+def test_breakeven_and_optimal_half_spread_on_the_grid() -> None:
+    mean_pnl = [-5.0, -1.0, 3.0, 8.0, 6.0, 2.0, 1.0, 0.5, 0.2]
+    assert len(mean_pnl) == len(HALF_SPREADS)
 
-    assert breakeven_half_spread([cell(0.0, -5), cell(0.5, -1), cell(1.0, 3), cell(1.5, -2)]) == 1.0
-    assert breakeven_half_spread([cell(0.0, -5), cell(0.5, -1)]) is None
+    assert breakeven_half_spread(mean_pnl) == HALF_SPREADS[2]
+    assert optimal_half_spread(mean_pnl) == HALF_SPREADS[3]
+    assert breakeven_half_spread([-1.0] * len(HALF_SPREADS)) is None
+
+
+def test_swept_strategy_keeps_tuned_parameters_except_half_spread() -> None:
+    skew = swept_strategy("Skew", 3.0)
+
+    assert skew == replace(REPORTED_STRATEGIES["Skew"], half_spread=3.0)
+    assert swept_strategy("Naive", 0.5) == NaiveConfig(half_spread=0.5)
+    with pytest.raises(ValueError, match="no half-spread"):
+        swept_strategy("A-S (Sharpe)", 1.0)
+
+
+def test_tuned_strategy_parameters_match_the_decisions() -> None:
+    assert {
+        "Naive": NaiveConfig(half_spread=1.5),
+        "Skew": InventorySkewConfig(half_spread=2.0, skew=0.5),
+        "A-S (Sharpe)": AvellanedaStoikovConfig(gamma=0.003, horizon=1000.0, k=0.627569),
+        "A-S (mean)": AvellanedaStoikovConfig(gamma=0.01, horizon=10.0, k=0.627569),
+    } == REPORTED_STRATEGIES

@@ -19,7 +19,11 @@ Work in progress.
 - Avellaneda-Stoikov uses a constant rolling horizon τ, tuned together with γ, instead of τ = T - t. With T = 5,000 steps and σ = 0.5, σ²(T - t) is about 1,250 at the start of a run, so the original quotes would be extremely wide and skewed early and almost unskewed at the end, and behaviour would depend mainly on the time within the run. The original form is available as `AvellanedaStoikovConfig(horizon=None)`. With a rolling horizon, γ and τ enter the reservation price and the risk part of the spread only through γ·τ, and γ alone has a small effect on the intensity part, so grid points with the same γ·τ give near-identical results.
 - k is calibrated from naive runs with h from 0 to 6 ticks on the tuning seeds. The fill rate per quoted side per step is measured in half-tick buckets of distance from the background mid the quote was computed from. log(rate) = log A - kδ is fitted by least squares weighted by the fill count of each bucket (the variance of a log rate is about 1/fills), using buckets with at least 20 fills.
 - Confidence intervals are normal approximations (mean ± 1.96·s/√n). Strategy comparisons use per-seed paired differences.
-- Strategy parameters are tuned on seeds 0-199 at π = 0.2 and L = 0 with a one-standard-error rule, so that grid noise does not decide the choice. The full grids are in `results/tuning_*.csv`.
+- Strategy parameters are tuned on seeds 0-199 at π = 0.2 and L = 0. The objective is the Sharpe ratio across seeds (mean / standard deviation of run PnL), with a one-standard-error rule: among grid points within one standard error of the best Sharpe ratio (SE ≈ √((1 + S²/2)/n)), the one with the highest mean PnL is selected. Because V is a martingale, inventory has zero expected PnL, so a mean-PnL objective drives α and γ·τ towards zero and skew and A-S collapse into naive quoting. A-S tuned on mean PnL (γ = 0.01, τ = 10, one-standard-error rule picking the lowest PnL standard deviation) is reported alongside as the risk-neutral contrast. The full grids under both objectives are in `results/tuning_*.csv`. `run_all` reruns the tuning and stops if it selects parameters other than those in `mmsim/config.py`.
+- E2, E3, E5 and E6 use report seeds 1000-1499. E4 (7 values of π × 9 half-spreads × 2 swept families, plus the 4 tuned strategies) uses seeds 1000-1199 to keep `run_all` near 15 minutes. Its jump-frequency sensitivity variant (jump probability 0.01 instead of 0.002, strategy parameters unchanged and not retuned) uses seeds 1000-1099.
+- The break-even half-spread is the smallest h on the grid (step 0.5 ticks) with mean PnL ≥ 0; 0 means the tightest quotes are already profitable. The optimal half-spread is the grid point with the highest mean PnL.
+- The part of the adverse-selection loss attributed to jumps is the edge on informed fills in the step of a jump or the 19 steps after it. The 20-step window covers the background delay d = 5 and the 9-step recovery of the mid measured in E0.
+- Markout curves pool the per-run means weighted by each run's number of fills against that counterparty type.
 
 ## How to run
 
@@ -31,4 +35,5 @@ uv run python -m pytest
 uv run ruff check .
 uv run ruff format --check .
 uv run python -m mypy src
+uv run python -m mmsim.experiments.run_all   # all results in results/, about 15 min on 12 threads
 ```

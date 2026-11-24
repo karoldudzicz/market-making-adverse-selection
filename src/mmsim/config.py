@@ -112,7 +112,7 @@ class MakerConfig:
 class NaiveConfig:
     """Symmetric quotes around the background mid: bid = mid - h, ask = mid + h.
 
-    Default values are provisional until parameter tuning.
+    Default values are tuned on seeds 0-199 (Sharpe objective, `results/tuning_naive.csv`).
 
     Attributes
     ----------
@@ -120,14 +120,14 @@ class NaiveConfig:
         Half-spread h in ticks.
     """
 
-    half_spread: float = 1.0
+    half_spread: float = 1.5
 
 
 @dataclass(frozen=True, slots=True)
 class InventorySkewConfig:
     """Symmetric quotes shifted against the position: mid - h - alpha*q and mid + h - alpha*q.
 
-    Default values are provisional until parameter tuning.
+    Default values are tuned on seeds 0-199 (Sharpe objective, `results/tuning_skew.csv`).
 
     Attributes
     ----------
@@ -137,15 +137,17 @@ class InventorySkewConfig:
         Skew alpha in ticks per lot of position.
     """
 
-    half_spread: float = 1.0
-    skew: float = 0.1
+    half_spread: float = 2.0
+    skew: float = 0.5
 
 
 @dataclass(frozen=True, slots=True)
 class AvellanedaStoikovConfig:
     """Avellaneda-Stoikov (2008) quotes.
 
-    Default values are provisional until parameter tuning and calibration of ``k``.
+    ``gamma`` and ``horizon`` defaults are tuned on seeds 0-199 (Sharpe objective,
+    `results/tuning_avellaneda_stoikov.csv`); ``k`` is calibrated in E0
+    (`results/e0_intensity_fit.csv`).
 
     Attributes
     ----------
@@ -158,9 +160,9 @@ class AvellanedaStoikovConfig:
         Decay rate of the fill intensity A * exp(-k * delta), per tick; positive.
     """
 
-    gamma: float = 0.01
-    horizon: float | None = 100.0
-    k: float = 1.0
+    gamma: float = 0.003
+    horizon: float | None = 1000.0
+    k: float = 0.627569
 
     def __post_init__(self) -> None:
         if self.gamma <= 0 or self.k <= 0:
@@ -185,3 +187,15 @@ class SimulationConfig:
             raise ValueError(f"n_steps must be positive, got {self.n_steps}")
         if self.maker.latency < 0:
             raise ValueError(f"latency must be non-negative, got {self.maker.latency}")
+
+
+AVELLANEDA_STOIKOV_MEAN_TUNED = AvellanedaStoikovConfig(gamma=0.01, horizon=10.0)
+"""Avellaneda-Stoikov tuned for mean PnL instead of the Sharpe ratio (risk-neutral)."""
+
+REPORTED_STRATEGIES: dict[str, StrategyConfig] = {
+    "Naive": NaiveConfig(),
+    "Skew": InventorySkewConfig(),
+    "A-S (Sharpe)": AvellanedaStoikovConfig(),
+    "A-S (mean)": AVELLANEDA_STOIKOV_MEAN_TUNED,
+}
+"""Strategies compared in the experiments, keyed by display label."""

@@ -14,6 +14,18 @@ GRID = "#e1e0d9"
 AXIS = "#c3c2b7"
 SURFACE = "#fcfcfb"
 SERIES = ("#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300")
+_BLUE_RAMP = (
+    "#86b6ef",
+    "#6da7ec",
+    "#5598e7",
+    "#3987e5",
+    "#2a78d6",
+    "#256abf",
+    "#1c5cab",
+    "#184f95",
+    "#104281",
+    "#0d366b",
+)
 
 _STYLE: dict[str, Any] = {
     "font.family": "sans-serif",
@@ -38,6 +50,14 @@ _STYLE: dict[str, Any] = {
     "xtick.color": MUTED,
     "ytick.color": MUTED,
 }
+
+
+def sequential(count: int) -> list[str]:
+    """Return ``count`` blue steps from light to dark for an ordered variable."""
+    if count == 1:
+        return [_BLUE_RAMP[-1]]
+    last = len(_BLUE_RAMP) - 1
+    return [_BLUE_RAMP[round(i * last / (count - 1))] for i in range(count)]
 
 
 def new_figure(width: float, height: float) -> Figure:

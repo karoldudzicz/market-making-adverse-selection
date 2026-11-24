@@ -16,7 +16,7 @@ from mmsim.config import (
 )
 from mmsim.engine import Fill, SimulationResult, simulate
 from mmsim.market import TakerType
-from mmsim.metrics import compute_metrics, markouts, pnl_breakdown
+from mmsim.metrics import compute_metrics, jump_attribution, markouts, pnl_breakdown
 from mmsim.orderbook import Side
 from mmsim.strategies import Naive, build_strategy
 
@@ -28,7 +28,7 @@ def handmade_result() -> SimulationResult:
         config=SimulationConfig(n_steps=3),
         seed=0,
         values=np.array([100.0, 101.0, 103.0, 102.0]),
-        jumps=np.zeros(4),
+        jumps=np.array([0.0, 0.0, 2.0, 0.0]),
         reference=np.zeros(4),
         market_mid=np.array([100.0, 100.5, 103.0, 101.0]),
         background_mid=np.zeros(4),
@@ -59,6 +59,23 @@ def test_markouts_of_handmade_run() -> None:
     assert table[TakerType.NOISE] == {1: 3.0, 2: 2.0, 5: pytest.approx(float("nan"), nan_ok=True)}
     assert table[TakerType.INFORMED][1] == 0.0
     assert np.isnan(table[TakerType.INFORMED][2])
+
+
+def test_jump_attribution_of_handmade_run() -> None:
+    attribution = jump_attribution(handmade_result(), window=1)
+
+    assert attribution.informed_edge == -1.0
+    assert attribution.inventory == 2.0
+
+
+def test_jump_window_excludes_fills_before_jump_and_after_window() -> None:
+    result = handmade_result()
+    result = replace(result, jumps=np.array([0.0, 0.0, 0.0, -1.0]))
+
+    attribution = jump_attribution(result, window=5)
+
+    assert attribution.informed_edge == 0.0
+    assert attribution.inventory == 0.0
 
 
 def test_run_metrics_of_handmade_run() -> None:

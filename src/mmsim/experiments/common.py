@@ -13,6 +13,7 @@ from numpy.typing import ArrayLike
 
 from mmsim.config import SimulationConfig, StrategyConfig
 from mmsim.engine import simulate
+from mmsim.market import FloatArray
 from mmsim.metrics import RunMetrics, compute_metrics
 from mmsim.strategies import build_strategy
 
@@ -53,6 +54,33 @@ class Estimate:
 def run_metrics(spec: RunSpec) -> RunMetrics:
     """Simulate one run and return its summary metrics."""
     return compute_metrics(simulate(spec.config, build_strategy(spec.strategy), spec.seed))
+
+
+def run_groups(
+    groups: Sequence[tuple[SimulationConfig, StrategyConfig]], seeds: range
+) -> list[list[RunMetrics]]:
+    """Run every (model, strategy) pair on every seed in one parallel batch.
+
+    Returns the metrics of each pair, in seed order, in the order of ``groups``.
+    """
+    specs = [RunSpec(config, strategy, seed) for config, strategy in groups for seed in seeds]
+    metrics = parallel_map(run_metrics, specs)
+    size = len(seeds)
+    return [metrics[index * size : (index + 1) * size] for index in range(len(groups))]
+
+
+def column(runs: Sequence[RunMetrics], metric: Callable[[RunMetrics], float]) -> FloatArray:
+    """Extract one metric of every run as an array."""
+    return np.array([metric(run) for run in runs], dtype=np.float64)
+
+
+PNL_COMPONENTS: dict[str, Callable[[RunMetrics], float]] = {
+    "pnl": lambda run: run.pnl.total,
+    "noise_edge": lambda run: run.pnl.noise_edge,
+    "informed_edge": lambda run: run.pnl.informed_edge,
+    "inventory": lambda run: run.pnl.inventory,
+}
+"""Total PnL and the three parts of its exact decomposition."""
 
 
 def parallel_map[T, R](fn: Callable[[T], R], items: Sequence[T]) -> list[R]:
