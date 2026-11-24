@@ -63,7 +63,9 @@ def test_background_posts_at_configured_depths_around_reference() -> None:
 
 def test_background_cancels_orders_far_from_reference() -> None:
     values = np.array([10_000.0] * 5 + [10_100.0] * 5)
-    config = BackgroundConfig(post_prob=1.0, noise_sd=0.0, delay=0, cancel_prob=1e-9)
+    config = BackgroundConfig(
+        post_prob=1.0, noise_sd=0.0, delay=0, cancel_prob=1e-9, cancel_through_reference=False
+    )
     background = BackgroundLiquidity(config, values, np.random.default_rng(0))
     book = OrderBook(initial_mid=10_000.0)
 
@@ -73,6 +75,36 @@ def test_background_cancels_orders_far_from_reference() -> None:
     prices = [o.price for side in Side for o in book.orders(side)]
     assert prices
     assert all(abs(price - 10_100) <= 15 for price in prices)
+
+
+@pytest.mark.parametrize("enabled", [True, False])
+def test_orders_left_on_wrong_side_by_a_jump_are_cancelled_when_reference_passes_them(
+    enabled: bool,
+) -> None:
+    values = np.array([10_000.0] * 10 + [9_990.0] * 10)
+    config = BackgroundConfig(
+        post_prob=1.0,
+        noise_sd=0.0,
+        delay=3,
+        cancel_prob=1e-9,
+        max_distance=100.0,
+        cancel_through_reference=enabled,
+    )
+    background = BackgroundLiquidity(config, values, np.random.default_rng(0))
+    book = OrderBook(initial_mid=10_000.0)
+    passing_step = 13
+    assert background.reference[passing_step - 1] == 10_000.0
+    assert background.reference[passing_step] == 9_990.0
+
+    for step in range(1, passing_step):
+        background.act(book, step)
+    old_bids, old_asks = book.orders(Side.BUY), book.orders(Side.SELL)
+    background.act(book, passing_step)
+
+    assert old_bids
+    assert all(o.price >= 9_990 for o in old_bids)
+    assert all((o.qty == 0) is enabled for o in old_bids)
+    assert all(o.qty > 0 for o in old_asks)
 
 
 def test_background_orders_expire_after_their_lifetime() -> None:

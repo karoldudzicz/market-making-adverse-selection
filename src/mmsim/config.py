@@ -44,6 +44,9 @@ class BackgroundConfig:
         Per-step probability that a resting order is cancelled.
     max_distance : float
         Orders further than this from the current reference are always cancelled.
+    cancel_through_reference : bool
+        Cancel orders at or through the current reference (bid >= R_t or ask <= R_t), which
+        a provider would value at a loss by its own reference.
     delay : int
         Information delay d of the reference behind the true value.
     noise_sd : float
@@ -58,6 +61,7 @@ class BackgroundConfig:
     max_depth: int = 10
     cancel_prob: float = 0.05
     max_distance: float = 15.0
+    cancel_through_reference: bool = True
     delay: int = 5
     noise_sd: float = 1.0
     order_qty: int = 1

@@ -75,9 +75,10 @@ class BackgroundLiquidity:
     In each step, each provider independently posts one post-only limit order per side with
     probability ``post_prob``, at a uniform random depth from the rounded reference
     R_t = V_{t-d} + eps_t. Orders are cancelled when they move more than ``max_distance``
-    from R_t, or at the end of a geometric lifetime drawn at posting, which is equivalent to
-    a per-step cancel probability ``cancel_prob`` but keeps the draws independent of the
-    state of the book.
+    from R_t, when ``cancel_through_reference`` is set and they sit at or through R_t
+    (bid >= R_t or ask <= R_t), or at the end of a geometric lifetime drawn at posting,
+    which is equivalent to a per-step cancel probability ``cancel_prob`` but keeps the draws
+    independent of the state of the book.
 
     Parameters
     ----------
@@ -116,11 +117,12 @@ class BackgroundLiquidity:
                 )
             )
         self._max_distance = config.max_distance
+        self._cancel_through_reference = config.cancel_through_reference
         self._order_qty = config.order_qty
         self._live: list[tuple[Order, int]] = []
 
     def act(self, book: OrderBook, step: int) -> None:
-        """Cancel expired and distant orders, then post this step's new orders."""
+        """Cancel expired and stale orders, then post this step's new orders."""
         reference = float(self.reference[step])
         self._cancel(book, step, reference)
         center = round(reference)
@@ -134,7 +136,13 @@ class BackgroundLiquidity:
         for order, expiry in self._live:
             if order.qty == 0:
                 continue
-            if step >= expiry or abs(order.price - reference) > self._max_distance:
+            # After a jump, orders left on the wrong side of the new reference are usually
+            # within max_distance; without the through-reference rule they rest until they
+            # expire and the mid lags V far longer than the information delay d.
+            through = self._cancel_through_reference and (
+                order.price >= reference if order.side is Side.BUY else order.price <= reference
+            )
+            if step >= expiry or through or abs(order.price - reference) > self._max_distance:
                 book.cancel(order.order_id)
             else:
                 kept.append((order, expiry))
