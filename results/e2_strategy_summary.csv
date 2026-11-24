@@ -1,5 +1,5 @@
-strategy,mean_pnl,pnl_ci95,std_pnl,sharpe,median_pnl,p05_pnl,p95_pnl,share_of_losing_runs,fills_per_run,informed_fills_per_run,mean_abs_position,mean_max_abs_position
+strategy,mean_pnl,pnl_ci95,std_pnl,pnl_mean_over_std,median_pnl,p05_pnl,p95_pnl,share_of_losing_runs,fills_per_run,informed_fills_per_run,mean_abs_position,mean_max_abs_position
 Naive,1259.88,48.2398,550.355,2.28921,1275.63,321.667,2126.81,0.02,870.418,26.796,9.39993,19.76
 Skew,972.66,6.12462,69.8741,13.9202,972.411,858.808,1088.2,0,595.806,17.726,0.779587,3.732
-A-S (Sharpe),896.022,5.59025,63.7776,14.0492,893,793.884,1006.01,0,553.198,16.932,0.644763,3.096
+A-S (mean/std),896.022,5.59025,63.7776,14.0492,893,793.884,1006.01,0,553.198,16.932,0.644763,3.096
 A-S (mean),1168.6,16.9731,193.642,6.03486,1166.7,854.921,1476.95,0,664.454,16.41,3.19501,12.052

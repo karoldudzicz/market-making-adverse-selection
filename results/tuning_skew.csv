@@ -1,4 +1,4 @@
-half_spread,skew,mean_pnl,pnl_ci95,std_pnl,sharpe,sharpe_se,fills_per_run,mean_abs_position,tied_mean,selected_mean,tied_sharpe,selected_sharpe
+half_spread,skew,mean_pnl,pnl_ci95,std_pnl,pnl_mean_over_std,pnl_mean_over_std_se,fills_per_run,mean_abs_position,tied_mean,selected_mean,tied_mean_over_std,selected_mean_over_std
 0,0,494.136,70.8341,511.104,0.9668,0.0856549,1218.84,9.88197,False,False,False,False
 0,0.02,463.762,71.5266,516.101,0.898588,0.0837774,1216.36,9.54329,False,False,False,False
 0,0.05,446.431,56.4284,407.16,1.09645,0.0894736,1231.47,7.27691,False,False,False,False

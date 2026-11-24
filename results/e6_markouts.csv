@@ -19,16 +19,16 @@ Skew,informed,1,-2.48035
 Skew,informed,5,-2.46366
 Skew,informed,20,-2.46199
 Skew,informed,100,-2.46434
-A-S (Sharpe),noise,0,1.75591
-A-S (Sharpe),noise,1,1.75773
-A-S (Sharpe),noise,5,1.75504
-A-S (Sharpe),noise,20,1.75636
-A-S (Sharpe),noise,100,1.75071
-A-S (Sharpe),informed,0,-2.4818
-A-S (Sharpe),informed,1,-2.48206
-A-S (Sharpe),informed,5,-2.46915
-A-S (Sharpe),informed,20,-2.48318
-A-S (Sharpe),informed,100,-2.52613
+A-S (mean/std),noise,0,1.75591
+A-S (mean/std),noise,1,1.75773
+A-S (mean/std),noise,5,1.75504
+A-S (mean/std),noise,20,1.75636
+A-S (mean/std),noise,100,1.75071
+A-S (mean/std),informed,0,-2.4818
+A-S (mean/std),informed,1,-2.48206
+A-S (mean/std),informed,5,-2.46915
+A-S (mean/std),informed,20,-2.48318
+A-S (mean/std),informed,100,-2.52613
 A-S (mean),noise,0,1.88999
 A-S (mean),noise,1,1.89145
 A-S (mean),noise,5,1.88705

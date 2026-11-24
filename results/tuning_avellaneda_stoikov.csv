@@ -1,4 +1,4 @@
-gamma,horizon,k,mean_pnl,pnl_ci95,std_pnl,sharpe,sharpe_se,fills_per_run,mean_abs_position,tied_mean,selected_mean,tied_sharpe,selected_sharpe
+gamma,horizon,k,mean_pnl,pnl_ci95,std_pnl,pnl_mean_over_std,pnl_mean_over_std_se,fills_per_run,mean_abs_position,tied_mean,selected_mean,tied_mean_over_std,selected_mean_over_std
 0.001,10,0.627569,1180.25,73.7243,531.958,2.21869,0.131554,617.35,9.23681,False,False,False,False
 0.001,30,0.627569,1206.95,55.7599,402.336,2.99986,0.165825,641.31,7.07369,True,False,False,False
 0.001,100,0.627569,1201.03,31.0532,224.064,5.3602,0.277181,662.74,3.68569,True,False,False,False
