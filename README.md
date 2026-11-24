@@ -65,11 +65,11 @@ Strategies, with s the background mid and q the position (bids rounded down, ask
 
 ## PnL decomposition
 
-For a fill with sign s (+1 buy, −1 sell) at price P in step t, with V_t taken after that step's value move:
+For a fill with sign s (+1 buy, −1 sell) at price P in step t, with $V_t$ taken after that step's value move:
 
-$$\text{cash}_T + q_T V_T = \underbrace{\sum_{\text{noise}} s\,(V_t - P)}_{\text{edge from noise takers}} + \underbrace{\sum_{\text{informed}} s\,(V_t - P)}_{\text{edge from informed takers}} + \underbrace{\sum_t q_{t-1}(V_t - V_{t-1})}_{\text{inventory PnL}}$$
+$$\text{cash}_T + q_T V_T = \underbrace{\sum_{\text{noise}} s(V_t - P)}_{\text{edge from noise takers}} + \underbrace{\sum_{\text{informed}} s(V_t - P)}_{\text{edge from informed takers}} + \underbrace{\sum_t q_{t-1}(V_t - V_{t-1})}_{\text{inventory PnL}}$$
 
-The identity is exact and is checked by a property-based test for every strategy. The edge from noise takers is spread capture, and the edge from informed takers is the adverse-selection loss. The markout of a fill at horizon h is s(V_{t+h} − P).
+The identity is exact and is checked by a property-based test for every strategy. The edge from noise takers is spread capture, and the edge from informed takers is the adverse-selection loss. The markout of a fill at horizon h is $s(V_{t+h} - P)$.
 
 ## Methodology
 
