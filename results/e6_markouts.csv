@@ -1,0 +1,41 @@
+strategy,counterparty,horizon,markout_per_lot
+Naive,noise,0,1.58261
+Naive,noise,1,1.58305
+Naive,noise,5,1.57938
+Naive,noise,20,1.57765
+Naive,noise,100,1.57635
+Naive,informed,0,-2.39852
+Naive,informed,1,-2.40535
+Naive,informed,5,-2.40047
+Naive,informed,20,-2.41026
+Naive,informed,100,-2.43548
+Skew,noise,0,1.76494
+Skew,noise,1,1.76609
+Skew,noise,5,1.76318
+Skew,noise,20,1.76611
+Skew,noise,100,1.7558
+Skew,informed,0,-2.48344
+Skew,informed,1,-2.48035
+Skew,informed,5,-2.46366
+Skew,informed,20,-2.46199
+Skew,informed,100,-2.46434
+A-S (Sharpe),noise,0,1.75591
+A-S (Sharpe),noise,1,1.75773
+A-S (Sharpe),noise,5,1.75504
+A-S (Sharpe),noise,20,1.75636
+A-S (Sharpe),noise,100,1.75071
+A-S (Sharpe),informed,0,-2.4818
+A-S (Sharpe),informed,1,-2.48206
+A-S (Sharpe),informed,5,-2.46915
+A-S (Sharpe),informed,20,-2.48318
+A-S (Sharpe),informed,100,-2.52613
+A-S (mean),noise,0,1.88999
+A-S (mean),noise,1,1.89145
+A-S (mean),noise,5,1.88705
+A-S (mean),noise,20,1.88509
+A-S (mean),noise,100,1.87978
+A-S (mean),informed,0,-2.6005
+A-S (mean),informed,1,-2.60195
+A-S (mean),informed,5,-2.59334
+A-S (mean),informed,20,-2.57167
+A-S (mean),informed,100,-2.64529

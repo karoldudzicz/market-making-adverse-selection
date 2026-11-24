@@ -1,0 +1,25 @@
+strategy,component,mean,ci95
+Naive,pnl,1259.88,48.2398
+Naive,noise_edge,1335.13,6.83669
+Naive,informed_edge,-64.2709,1.65347
+Naive,inventory,-10.9783,47.0841
+Naive,informed_edge_after_jumps,-26.593,1.42219
+Naive,inventory_from_jumps,-15.6,31.5681
+Skew,pnl,972.66,6.12462
+Skew,noise_edge,1020.28,5.76732
+Skew,informed_edge,-44.0214,1.3419
+Skew,inventory,-3.59725,4.43753
+Skew,informed_edge_after_jumps,-19.4763,1.17334
+Skew,inventory_from_jumps,-1.5,3.02461
+A-S (Sharpe),pnl,896.022,5.59025
+A-S (Sharpe),noise_edge,941.633,5.48353
+A-S (Sharpe),informed_edge,-42.0218,1.32448
+A-S (Sharpe),inventory,-3.58832,3.58882
+A-S (Sharpe),informed_edge_after_jumps,-18.3418,1.14705
+A-S (Sharpe),inventory_from_jumps,-1.28,2.46854
+A-S (mean),pnl,1168.6,16.9731
+A-S (mean),noise_edge,1224.8,6.81637
+A-S (mean),informed_edge,-42.6742,1.39065
+A-S (mean),inventory,-13.5204,15.8284
+A-S (mean),informed_edge_after_jumps,-21.388,1.23314
+A-S (mean),inventory_from_jumps,-10.04,11.1505

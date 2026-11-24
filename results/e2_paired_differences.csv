@@ -1,0 +1,4 @@
+strategy,baseline,mean_pnl_difference,ci95,share_of_seeds_better
+Skew,Naive,-287.219,47.1857,0.284
+A-S (Sharpe),Naive,-363.856,47.2485,0.236
+A-S (mean),Naive,-91.2773,41.4757,0.402
